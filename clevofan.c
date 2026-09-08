@@ -20,12 +20,8 @@
 #define GPU_FAN2_SPEED_OFFSET_0  0xD4
 #define GPU_FAN2_SPEED_OFFSET_1  0xD5
 
-#define EC_SC 0x66
-#define EC_DATA 0x62
-#define IBF 1
-#define OBF 0
-
-#define MODVERS "1.0"
+#define FAN_READ_RETRIES 3
+#define MODVERS "1.1"
 
 static int force_match = 0;
 static uint8_t fan_count;
@@ -38,9 +34,15 @@ static const struct dmi_system_id clevo_dmi[] =
     { .matches = { DMI_MATCH(DMI_BOARD_NAME, "W350SS"), }, },
     { .matches = { DMI_MATCH(DMI_BOARD_NAME, "P170SM-A"), }, },
     { .matches = { DMI_MATCH(DMI_BOARD_NAME, "P65xHP"), }, },
+    { .matches = { DMI_MATCH(DMI_BOARD_NAME, "V5xTNC_TND_TNE"), }, },
     {}
 };
 MODULE_DEVICE_TABLE(dmi, clevo_dmi);
+
+static bool is_juno_v5(void)
+{
+    return dmi_match(DMI_BOARD_NAME, "V5xTNC_TND_TNE");
+}
 
 static uint8_t get_fan_count(void)
 {
@@ -48,7 +50,8 @@ static uint8_t get_fan_count(void)
         dmi_match(DMI_BOARD_NAME, "W350SS"  )  )
         return 1;
         
-    else if( dmi_match(DMI_BOARD_NAME, "P170SM"))         //mainboards with 2 fans
+    else if( dmi_match(DMI_BOARD_NAME, "P170SM") ||
+             is_juno_v5() )                                //mainboards with 2 fans
         return 2;
     
     else if( dmi_match(DMI_BOARD_NAME, "XXXXXXXX") ||     //mainboards with 3 fans
@@ -58,38 +61,66 @@ static uint8_t get_fan_count(void)
         else return 1;
 }
 
-static int ec_io_wait(const uint32_t port, const uint32_t flag, const char value) {
-    uint8_t data = inb(port);
-    int i = 0;
-    while ((((data >> flag) & 0x1) != value) && (i++ < 100)) {
-        udelay(1000);
-        data = inb(port);
-    }
-    if (i >= 100) {
-        pr_warn("wait_ec error on port 0x%x, data=0x%x, flag=0x%x, value=0x%x\n",
-                port, data, flag, value);
-        return -EIO;
-    }
-    return 0;
+static int ec_io_do(const uint32_t cmd, const uint32_t port, const uint8_t value) {
+    u8 data[] = { port, value };
+
+    return ec_transaction(cmd, data, ARRAY_SIZE(data), NULL, 0);
 }
 
-static int ec_io_do(const uint32_t cmd, const uint32_t port, const uint8_t value) {
-    ec_io_wait(EC_SC, IBF, 0);
-    outb(cmd, EC_SC);
+static uint8_t fan_control_index(uint8_t index)
+{
+    if (is_juno_v5() && index == 1)
+        return 4;
 
-    ec_io_wait(EC_SC, IBF, 0);
-    outb(port, EC_DATA);
+    return index + 1;
+}
 
-    ec_io_wait(EC_SC, IBF, 0);
-    outb(value, EC_DATA);
+static int fan_read_ticks(uint8_t first_offset, uint8_t second_offset, int *ticks)
+{
+    uint8_t first_before, first_after, second;
+    int i, ret;
 
-    return ec_io_wait(EC_SC, IBF, 0);
+    for (i = 0; i < FAN_READ_RETRIES; i++) {
+        ret = ec_read(first_offset, &first_before);
+        if (ret)
+            return ret;
+        ret = ec_read(second_offset, &second);
+        if (ret)
+            return ret;
+        ret = ec_read(first_offset, &first_after);
+        if (ret)
+            return ret;
+        if (first_before == first_after) {
+            *ticks = (first_before << 8) | second;
+            return 0;
+        }
+    }
+
+    return -EAGAIN;
+}
+
+static int fan_read_ticks_by_index(uint8_t index, int *ticks)
+{
+    if (index == 0)
+        return fan_read_ticks(CPU_FAN_SPEED_OFFSET_0,
+                              CPU_FAN_SPEED_OFFSET_1, ticks);
+    if (index == 1 && is_juno_v5())
+        return fan_read_ticks(GPU_FAN2_SPEED_OFFSET_0,
+                              GPU_FAN2_SPEED_OFFSET_1, ticks);
+    if (index == 1)
+        return fan_read_ticks(GPU_FAN_SPEED_OFFSET_0,
+                              GPU_FAN_SPEED_OFFSET_1, ticks);
+    if (index == 2)
+        return fan_read_ticks(GPU_FAN2_SPEED_OFFSET_0,
+                              GPU_FAN2_SPEED_OFFSET_1, ticks);
+
+    return -EINVAL;
 }
 
 static int fan_set_pwm(uint8_t value, uint8_t index)
 {
     int ret;
-    ret = ec_io_do(FAN_DUTY_CMD, index+1, value);
+    ret = ec_io_do(FAN_DUTY_CMD, fan_control_index(index), value);
     if(ret != 0) 
         return ret;
     pwm_curr_value[index] = value;
@@ -100,14 +131,23 @@ static int fan_set_pwm(uint8_t value, uint8_t index)
 static int fan_auto_mode(uint8_t index)
 {
     if(fan_auto[index] == 0) {
-        int ret;
-        ret = ec_io_do(FAN_DUTY_CMD, index+1, 0); //seems put fan off before setting auto mode is necessary
+        int restore_ret, ret;
+        uint8_t previous_pwm = pwm_curr_value[index];
+
+        ret = ec_io_do(FAN_DUTY_CMD, fan_control_index(index), 0); //seems put fan off before setting auto mode is necessary
         if(ret != 0) 
             return ret;
-        mdelay(100); //value found with tests
-        ret = ec_io_do(FAN_DUTY_CMD, FAN_PORT_AUTO_MODE, index+1);
-        if(ret != 0) 
+        msleep(100); //value found with tests
+        ret = ec_io_do(FAN_DUTY_CMD, FAN_PORT_AUTO_MODE,
+                       fan_control_index(index));
+        if(ret != 0) {
+            restore_ret = ec_io_do(FAN_DUTY_CMD,
+                                   fan_control_index(index), previous_pwm);
+            if (restore_ret)
+                pr_err("failed to restore fan %u after auto-mode error: %d\n",
+                       index, restore_ret);
             return ret;
+        }
         fan_auto[index] = 1;
         pwm_curr_value[index] = -1;
     }
@@ -134,28 +174,19 @@ static umode_t clevo_hwmon_is_visible(const void *data, enum hwmon_sensor_types 
             return 0;
         }
     }
-    return -EINVAL;
+    return 0;
 }
 
 static int clevo_hwmon_read(struct device *dev, enum hwmon_sensor_types type, u32 attr, int channel, long *val)
 {
     if(type == hwmon_fan)
     {
-        u8 fan_data[2];
         int ec_ticks_per_rotation = 0;
-        if(channel == 0) {
-            ec_read(CPU_FAN_SPEED_OFFSET_0, &fan_data[0]);
-            ec_read(CPU_FAN_SPEED_OFFSET_1, &fan_data[1]);
-        }
-        else if(channel == 1) {
-            ec_read(GPU_FAN_SPEED_OFFSET_0, &fan_data[0]);
-            ec_read(GPU_FAN_SPEED_OFFSET_1, &fan_data[1]);
-        }
-        else if(channel == 2) {
-            ec_read(GPU_FAN2_SPEED_OFFSET_0, &fan_data[0]);
-            ec_read(GPU_FAN2_SPEED_OFFSET_1, &fan_data[1]);
-        }
-        ec_ticks_per_rotation = (fan_data[0]<<8)|(fan_data[1]);
+        int ret;
+
+        ret = fan_read_ticks_by_index(channel, &ec_ticks_per_rotation);
+        if (ret)
+            return ret;
         if (ec_ticks_per_rotation == 0)
             *val = 0;
         else
@@ -197,6 +228,8 @@ static int clevo_hwmon_write(struct device *dev, enum hwmon_sensor_types type, u
     {
         if(attr == hwmon_pwm_input) 
         {
+            if (val < 0 || val > 255)
+                return -EINVAL;
             if(fan_auto[channel] == 0)
                 return fan_set_pwm(val, channel);
             else return -EOPNOTSUPP;
@@ -291,6 +324,10 @@ static struct platform_driver clevo_platdrv = {
 static int __init clevo_platform_probe(struct platform_device *pdev)
 {
     struct device *hwmon_dev;
+
+    if (force_match < 0 || force_match > 3)
+        return -EINVAL;
+
     fan_count = force_match;
     if(fan_count == 0)
         fan_count = get_fan_count();
@@ -318,8 +355,12 @@ static struct platform_device *clevo_platdvc;
 static int __init clevofan_init(void)
 {
     acpi_handle ec_handle;
-    
-    if(strncmp(dmi_get_system_info(DMI_BOARD_VENDOR), "CLEVO CO.", 9) != 0)
+    const char *board_vendor;
+    int ret;
+
+    board_vendor = dmi_get_system_info(DMI_BOARD_VENDOR);
+    if(!is_juno_v5() &&
+       (!board_vendor || strncmp(board_vendor, "CLEVO CO.", 9) != 0))
         return -ENODEV;
     if (!dmi_first_match(clevo_dmi) && force_match == 0)
         return -ENODEV;
@@ -330,9 +371,17 @@ static int __init clevofan_init(void)
     
     pr_info("Found CLEVO %s, creating hwmon interfaces\n", dmi_get_system_info(DMI_BOARD_NAME));
     clevo_platdvc = platform_create_bundle(&clevo_platdrv, clevo_platform_probe, NULL, 0, NULL, 0);
-    register_pm_notifier(&nb);
+    if (IS_ERR(clevo_platdvc))
+        return PTR_ERR(clevo_platdvc);
 
-    return PTR_ERR_OR_ZERO(clevo_platdvc);
+    ret = register_pm_notifier(&nb);
+    if (ret) {
+        platform_device_unregister(clevo_platdvc);
+        platform_driver_unregister(&clevo_platdrv);
+        return ret;
+    }
+
+    return 0;
 }
 
 static void __exit clevofan_exit(void)

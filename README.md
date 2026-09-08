@@ -28,7 +28,10 @@ P170SM:   not tested
 * force_match [default:0] force driver to match with non-compatible mainboard, set number of fans to enable
   
 ## Please read CAREFULLY
-This module executes write operations on the mainboard's Embedded Controller (EC). Thus reading is totally secure, issuing fan speed commands can teoretically put EC in a bad state until system is rebooted. This is caused by the nature of fan speed command, because is splitted in two different calls to EC: first one specifies the fan, second one the speed. If another module/acpi stuffs issues a command between those two calls, EC response/action is unpredictable.
+This fork sends each fan command through the Linux ACPI EC transaction API.
+The API serializes the command with other ACPI EC requests.
+The original driver wrote the EC ports directly.
+Direct writes could interleave with ACPI requests and select the wrong fan or duty.
 
 ## Install
 ```bash

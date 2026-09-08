@@ -1,3 +1,5 @@
+.PHONY: default clean install load test uninstall
+
 name := clevofan
 obj-m := $(name).o
 
@@ -11,6 +13,9 @@ endif
 
 default:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
+
+test:
+	./tests/check-source.sh
 
 clean:
 	$(MAKE) O=$(PWD) -C $(KDIR) M=$(PWD) clean
