@@ -69,9 +69,6 @@ static int ec_io_do(const uint32_t cmd, const uint32_t port, const uint8_t value
 
 static uint8_t fan_control_index(uint8_t index)
 {
-    if (is_juno_v5() && index == 1)
-        return 4;
-
     return index + 1;
 }
 
@@ -104,9 +101,6 @@ static int fan_read_ticks_by_index(uint8_t index, int *ticks)
     if (index == 0)
         return fan_read_ticks(CPU_FAN_SPEED_OFFSET_0,
                               CPU_FAN_SPEED_OFFSET_1, ticks);
-    if (index == 1 && is_juno_v5())
-        return fan_read_ticks(GPU_FAN2_SPEED_OFFSET_0,
-                              GPU_FAN2_SPEED_OFFSET_1, ticks);
     if (index == 1)
         return fan_read_ticks(GPU_FAN_SPEED_OFFSET_0,
                               GPU_FAN_SPEED_OFFSET_1, ticks);

@@ -18,8 +18,10 @@ check_source()
 		return 1
 	fi
 	grep -Fq 'force_match < 0 || force_match > 3' "$source" || return 1
-	grep -Fq 'if (is_juno_v5() && index == 1)' "$source" || return 1
-	grep -Fq 'return 4;' "$source" || return 1
+	if grep -Fq 'return 4;' "$source"; then
+		return 1
+	fi
+	[ "$(grep -Fc 'GPU_FAN2_SPEED_OFFSET_0' "$source")" -eq 2 ] || return 1
 	grep -Fq 'GPU_FAN2_SPEED_OFFSET_0' "$source" || return 1
 	grep -Fq 'restore_ret = ec_io_do' "$source" || return 1
 }
@@ -51,7 +53,7 @@ if check_source "$tmp/clevofan.c"; then
 fi
 
 cp "$repo/clevofan.c" "$tmp/clevofan.c"
-sed -i 's/return 4;/return index + 1;/' "$tmp/clevofan.c"
+sed -i 's/^    return index + 1;$/    if (is_juno_v5() \&\& index == 1)\n        return 4;\n    return index + 1;/' "$tmp/clevofan.c"
 if check_source "$tmp/clevofan.c"; then
 	echo 'Juno fan mapping mutation passed' >&2
 	exit 1
