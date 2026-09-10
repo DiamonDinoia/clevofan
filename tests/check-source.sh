@@ -22,7 +22,6 @@ check_source()
 		return 1
 	fi
 	[ "$(grep -Fc 'GPU_FAN2_SPEED_OFFSET_0' "$source")" -eq 2 ] || return 1
-	grep -Fq 'GPU_FAN2_SPEED_OFFSET_0' "$source" || return 1
 	grep -Fq 'restore_ret = ec_io_do' "$source" || return 1
 }
 
