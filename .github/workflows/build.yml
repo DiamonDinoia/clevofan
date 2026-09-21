@@ -1,0 +1,46 @@
+name: build
+
+# Builds this fork's deb and attaches it to the `builds` release. The apt
+# repository at DiamonDinoia/apt republishes exactly these bytes, verified
+# against the digest GitHub reports for each asset, so the served package
+# always matches what this CI built and tested.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: debs
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install packaging tools and podman
+        run: sudo apt-get update && sudo apt-get install -y build-essential dpkg-dev debhelper dh-dkms podman
+
+      - name: Build and install-test the package
+        run: ./test-install.sh
+
+      - name: Publish the deb as a release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view builds >/dev/null 2>&1 ||
+            gh release create builds --notes "Built debs. Do not delete."
+          for deb in ../*.deb; do
+            [ -f "$deb" ] || { echo "no debs built"; exit 1; }
+            gh release upload builds "$deb" --clobber
+            remote=$(gh release view builds --json assets \
+              --jq ".assets[] | select(.name == \"$(basename "$deb")\") | .digest")
+            [ "$remote" = "sha256:$(sha256sum "$deb" | cut -d' ' -f1)" ] ||
+              { echo "FAIL  uploaded $(basename "$deb") hashes $remote, not the local bytes"; exit 1; }
+          done

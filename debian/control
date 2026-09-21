@@ -1,0 +1,21 @@
+Source: clevofan-dkms
+Section: kernel
+Priority: optional
+Maintainer: Marco Barbone <mbarbone@flatironinstitute.org>
+Build-Depends: debhelper-compat (= 13), dh-dkms
+Standards-Version: 4.6.2
+Homepage: https://github.com/DiamonDinoia/clevofan
+
+Package: clevofan-dkms
+Architecture: amd64
+Depends: dkms, kmod, ${misc:Depends}
+Recommends: linux-headers-amd64
+Description: Clevo/Juno EC fan control module (dkms), ec_transaction-serialized
+ Builds and installs the clevofan kernel module via dkms, exposing Clevo
+ mainboard fan speed and PWM control through standard hwmon sysfs
+ attributes for lm-sensors, pwmconfig and fancontrol.
+ .
+ This fork serializes every EC access through the kernel's own
+ ec_transaction(), replacing raw port I/O that raced the ACPI EC driver, and
+ folds the V5xTNC_TND_TNE second-fan mapping into the generic per-model
+ table instead of a one-off special case.

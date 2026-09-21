@@ -1,0 +1,12 @@
+clevofan-dkms (1.1+diamon1) unstable; urgency=low
+
+  * Repackage this fork as clevofan-dkms via dh_dkms (--with dkms),
+    replacing Juno's hand-rolled postinst/prerm (cp into /usr/src, raw
+    dkms add/install/remove) and its unserialized EC port I/O.
+  * Fixes the V5xTNC_TND_TNE second fan: control index 2, tach
+    0xD2/0xD3, folded into the generic per-model table instead of a
+    one-off special case (Juno 0.4.0-2 maps it to index 4, 0xD4/0xD5).
+  * Serializes every EC access through ec_transaction(), so this driver
+    no longer races the ACPI EC driver's own port I/O.
+
+ -- Marco Barbone <mbarbone@flatironinstitute.org>  Mon, 21 Sep 2026 13:11:12 -0400

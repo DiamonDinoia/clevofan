@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+# debian/rules
+# -*- makefile -*-
+
+VERSION := $(shell sed -n 's/^PACKAGE_VERSION=//p' dkms.conf)
+
+%:
+	dh $@ --with dkms
+
+# dh_dkms stages the module source itself, driven by debian/clevofan-dkms.dkms
+# (which points at dkms.conf); the two files dkms.conf's MAKE[] and
+# BUILT_MODULE_LOCATION need at that path are staged here explicitly. Skips
+# dh_auto_install/`make install`: the fork's own install target hardcodes
+# /lib/modules/.../updates outside DESTDIR, for the non-packaged dev
+# workflow, not dh's staging tree.
+override_dh_auto_install:
+	install -dm755 debian/clevofan-dkms/usr/src/clevofan-$(VERSION)
+	install -Dpm 0644 clevofan.c debian/clevofan-dkms/usr/src/clevofan-$(VERSION)/clevofan.c
+	install -Dpm 0644 Makefile debian/clevofan-dkms/usr/src/clevofan-$(VERSION)/Makefile
