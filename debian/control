@@ -15,7 +15,7 @@ Description: Clevo/Juno EC fan control module (dkms), ec_transaction-serialized
  mainboard fan speed and PWM control through standard hwmon sysfs
  attributes for lm-sensors, pwmconfig and fancontrol.
  .
- This fork serializes every EC access through the kernel's own
- ec_transaction(), replacing raw port I/O that raced the ACPI EC driver, and
- folds the V5xTNC_TND_TNE second-fan mapping into the generic per-model
- table instead of a one-off special case.
+ This fork sends every EC access through the kernel's ACPI EC driver
+ (ec_transaction() and ec_read()), replacing raw port I/O that raced it, and
+ drives the V5xTNC_TND_TNE second fan through the generic mapping
+ (control index 2, tach 0xD2/0xD3).

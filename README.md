@@ -7,6 +7,7 @@ Kernel module that provides fan control for various Clevo mainboards via standar
 W35_37ET: supported and completely tested
 W350SS:   not tested
 P170SM:   not tested
+V5xTNC_TND_TNE (Juno): 2 fans
 ```
 * Teoretically supports all Clevo laptops but I have to add correct DMI_BOARD_NAME string and fan number to make module load without force_match parameter. Please open an issue "Add support for *model*" and attach the output file of *dmi_info_dump* script, then I'll add support (look "parameters" section for tests).
 
@@ -21,7 +22,8 @@ P170SM:   not tested
   - Exposed hwmon PWM interface to make every fan control software capable of controlling the fan speed
   - pwmX-enable possible values are <br>
   1 -> manual speed <br>
-  2 -> default EC automatic speed
+  2 (or 0) -> default EC automatic speed <br>
+  any other value -> EINVAL
 
 ## Parameters
 
