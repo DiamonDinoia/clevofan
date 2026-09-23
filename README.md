@@ -36,6 +36,7 @@ The original driver wrote the EC ports directly.
 Direct writes could interleave with ACPI requests and select the wrong fan or duty.
 
 ## Install
+Needs Linux 6.5 or newer: the driver uses `guard(mutex)` from `<linux/cleanup.h>`.
 ```bash
 make
 make install
