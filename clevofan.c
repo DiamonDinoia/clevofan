@@ -342,7 +342,7 @@ static int __init clevo_platform_probe(struct platform_device *pdev)
         devm_hwmon_device_register_with_info(&pdev->dev, 
         dmi_get_system_info(DMI_BOARD_NAME), NULL, &clevo_hwmon_chip_info2, NULL);
 
-    else if(fan_count == 3)
+    else
         hwmon_dev = 
         devm_hwmon_device_register_with_info(&pdev->dev, 
         dmi_get_system_info(DMI_BOARD_NAME), NULL, &clevo_hwmon_chip_info3, NULL);
