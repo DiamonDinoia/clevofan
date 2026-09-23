@@ -7,6 +7,10 @@ VERSION := $(shell sed -n 's/^PACKAGE_VERSION=//p' dkms.conf)
 %:
 	dh $@ --with dkms
 
+# The module is built by dkms on the target; building it here would need
+# the build host's kernel headers, which Build-Depends does not carry.
+override_dh_auto_build override_dh_auto_clean:
+
 # dh_dkms stages the module source itself, driven by debian/clevofan-dkms.dkms
 # (which points at dkms.conf); the two files dkms.conf's MAKE[] and
 # BUILT_MODULE_LOCATION need at that path are staged here explicitly. Skips
