@@ -1,3 +1,14 @@
+clevofan-dkms (1.1+diamon2) unstable; urgency=medium
+
+  * Always assign hwmon_dev in the platform probe.
+  * Serialize fan state between sysfs writes and the PM notifier.
+  * Restore EC auto mode on unload only after sysfs and the notifier are gone.
+  * Reject pwm_enable values other than 0, 1 and 2 with -EINVAL.
+  * Pin the hwmon channel to tachometer register pairing in check-source.sh.
+  * Correct the packaging text and README to what the code matches.
+
+ -- Marco Barbone <mbarbone@flatironinstitute.org>  Wed, 23 Sep 2026 17:04:06 -0400
+
 clevofan-dkms (1.1+diamon1) unstable; urgency=low
 
   * Repackage this fork as clevofan-dkms via dh_dkms (--with dkms),
