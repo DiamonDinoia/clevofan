@@ -15,7 +15,8 @@ default:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 test:
-	./tests/check-source.sh
+	./tests/harness.sh
+	./test-dkms-conf.sh
 
 clean:
 	$(MAKE) O=$(PWD) -C $(KDIR) M=$(PWD) clean
