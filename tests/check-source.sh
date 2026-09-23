@@ -24,6 +24,10 @@ check_source()
 	[ "$(grep -Fc 'GPU_FAN2_SPEED_OFFSET_0' "$source")" -eq 2 ] || return 1
 	grep -Fq 'restore_ret = ec_io_do' "$source" || return 1
 	[ "$(grep -Fc 'guard(mutex)(&fan_lock);' "$source")" -eq 2 ] || return 1
+	# every board get_fan_count() names exactly must be a clevo_dmi entry
+	for board in $(grep -oE 'dmi_match\(DMI_BOARD_NAME, "[^"]+"' "$source" | cut -d'"' -f2 | grep -vx 'XXXXXXXX'); do
+		grep -Fq "DMI_MATCH(DMI_BOARD_NAME, \"$board\")" "$source" || return 1
+	done
 	# hwmon channel -> tach register pair: 0 CPU 0xD0/1, 1 GPU 0xD2/3, 2 GPU2 0xD4/5
 	[ "$(grep -A1 -E '^    if \(index == [0-9]\)$' "$source" | grep -oE 'index == [0-9]|[A-Z0-9_]+_SPEED_OFFSET_0' | tr '\n' ' ')" = \
 	  'index == 0 CPU_FAN_SPEED_OFFSET_0 index == 1 GPU_FAN_SPEED_OFFSET_0 index == 2 GPU_FAN2_SPEED_OFFSET_0 ' ] || return 1
@@ -108,6 +112,13 @@ cp "$repo/clevofan.c" "$tmp/clevofan.c"
 sed -i 's/CPU_FAN_SPEED_OFFSET_0,$/GPU_FAN_SPEED_OFFSET_0,/;t;s/        return fan_read_ticks(GPU_FAN_SPEED_OFFSET_0,$/        return fan_read_ticks(CPU_FAN_SPEED_OFFSET_0,/' "$tmp/clevofan.c"
 if check_source "$tmp/clevofan.c"; then
 	echo 'swapped CPU/GPU tachometer mutation passed' >&2
+	exit 1
+fi
+
+cp "$repo/clevofan.c" "$tmp/clevofan.c"
+sed -i 's/dmi_match(DMI_BOARD_NAME, "P170SM-A")/dmi_match(DMI_BOARD_NAME, "P170SM")/' "$tmp/clevofan.c"
+if check_source "$tmp/clevofan.c"; then
+	echo 'P170SM fan-count name missing from clevo_dmi mutation passed' >&2
 	exit 1
 fi
 

@@ -51,7 +51,7 @@ static uint8_t get_fan_count(void)
         dmi_match(DMI_BOARD_NAME, "W350SS"  )  )
         return 1;
         
-    else if( dmi_match(DMI_BOARD_NAME, "P170SM") ||
+    else if( dmi_match(DMI_BOARD_NAME, "P170SM-A") ||
              is_juno_v5() )                                //mainboards with 2 fans
         return 2;
     

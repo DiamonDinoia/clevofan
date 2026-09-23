@@ -6,6 +6,7 @@ clevofan-dkms (1.1+diamon2) unstable; urgency=medium
   * Reject pwm_enable values other than 0, 1 and 2 with -EINVAL.
   * Pin the hwmon channel to tachometer register pairing in check-source.sh.
   * Correct the packaging text and README to what the code matches.
+  * Give P170SM-A the 2 fans its board name was meant to get.
 
  -- Marco Barbone <mbarbone@flatironinstitute.org>  Wed, 23 Sep 2026 17:04:06 -0400
 
