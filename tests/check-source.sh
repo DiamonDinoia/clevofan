@@ -36,7 +36,7 @@ check_source()
 	     f && /^}/ { exit !(pm && dev && fan && pm < fan && dev < fan) }' "$source" || return 1
 }
 
-check_source "$repo/clevofan.c"
+check_source "$repo/clevofan.c" || { echo "clevofan.c failed: $( (set -x; check_source "$repo/clevofan.c") 2>&1 | grep -v "^+ return" | grep "^+ " | tail -1)" >&2; exit 1; }
 
 tmp=$(mktemp -d /tmp/clevofan-source-check.XXXXXX)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
