@@ -385,6 +385,10 @@ static int __init clevofan_init(void)
 static void __exit clevofan_exit(void)
 {
     uint8_t i;
+
+    unregister_pm_notifier(&nb);
+    platform_device_unregister(clevo_platdvc); // drains sysfs writers before auto mode is restored
+    platform_driver_unregister(&clevo_platdrv);
     for(i=0; i<fan_count;i++) {
         if(fan_auto[i] == 0) {
             fan_auto_mode(i);
@@ -392,9 +396,6 @@ static void __exit clevofan_exit(void)
         }
     }
     pr_info("exiting module\n");
-    platform_device_unregister(clevo_platdvc);
-    platform_driver_unregister(&clevo_platdrv);
-    unregister_pm_notifier(&nb);
 }
 
 module_init(clevofan_init);

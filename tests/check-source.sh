@@ -24,6 +24,12 @@ check_source()
 	[ "$(grep -Fc 'GPU_FAN2_SPEED_OFFSET_0' "$source")" -eq 2 ] || return 1
 	grep -Fq 'restore_ret = ec_io_do' "$source" || return 1
 	[ "$(grep -Fc 'guard(mutex)(&fan_lock);' "$source")" -eq 2 ] || return 1
+	# module exit: notifier and sysfs gone before auto mode is restored
+	awk '/^static void __exit clevofan_exit/ { f = 1 }
+	     f && /unregister_pm_notifier\(&nb\);/ { pm = NR }
+	     f && /platform_device_unregister\(clevo_platdvc\);/ { dev = NR }
+	     f && /fan_auto_mode\(i\);/ { fan = NR }
+	     f && /^}/ { exit !(pm && dev && fan && pm < fan && dev < fan) }' "$source" || return 1
 }
 
 check_source "$repo/clevofan.c"
@@ -77,6 +83,13 @@ cp "$repo/clevofan.c" "$tmp/clevofan.c"
 sed -i '/int8_t i;/,/guard(mutex)(&fan_lock);/{/guard(mutex)(&fan_lock);/d}' "$tmp/clevofan.c"
 if check_source "$tmp/clevofan.c"; then
 	echo 'unlocked PM notifier mutation passed' >&2
+	exit 1
+fi
+
+cp "$repo/clevofan.c" "$tmp/clevofan.c"
+sed -i '/^static void __exit clevofan_exit/,/^}/{/platform_device_unregister(clevo_platdvc);/d;s/^    pr_info("exiting module\\n");$/&\n    platform_device_unregister(clevo_platdvc);/}' "$tmp/clevofan.c"
+if check_source "$tmp/clevofan.c"; then
+	echo 'exit restores auto mode before sysfs removal mutation passed' >&2
 	exit 1
 fi
 
