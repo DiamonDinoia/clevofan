@@ -27,6 +27,7 @@ static int force_match = 0;
 static uint8_t fan_count;
 static uint8_t pwm_curr_value[3] = { -1, -1, -1 };
 static uint8_t fan_auto[3] =       {  1,  1,  1 };
+static DEFINE_MUTEX(fan_lock); // fan state and multi-command EC sequences: sysfs vs PM notifier
 
 static const struct dmi_system_id clevo_dmi[] = 
 {    
@@ -218,6 +219,7 @@ static int clevo_hwmon_read_label(struct device *dev, enum hwmon_sensor_types ty
 
 static int clevo_hwmon_write(struct device *dev, enum hwmon_sensor_types type, u32 attr, int channel, long val)
 {
+    guard(mutex)(&fan_lock);
     if(type == hwmon_pwm) 
     {
         if(attr == hwmon_pwm_input) 
@@ -249,6 +251,8 @@ static int clevo_pm_handler(struct notifier_block *nbp, unsigned long event_type
         case PM_POST_RESTORE:
         {
             int8_t i;
+
+            guard(mutex)(&fan_lock);
             for(i=0; i<fan_count;i++) {
                 if(fan_auto[i] == 0) 
                     fan_set_pwm(pwm_curr_value[i], i);
