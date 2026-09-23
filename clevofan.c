@@ -236,6 +236,8 @@ static int clevo_hwmon_write(struct device *dev, enum hwmon_sensor_types type, u
                  fan_auto[channel] = 0;
              else if(val == 2 || val == 0) 
                 return fan_auto_mode(channel);
+             else
+                return -EINVAL;
             return 0;
         }
         else return -EOPNOTSUPP;
