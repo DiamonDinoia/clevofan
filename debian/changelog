@@ -1,3 +1,18 @@
+clevofan-dkms (1.1+diamon3) unstable; urgency=medium
+
+  * Reload the module on install: the old Juno package's postinst ran
+    modprobe and its prerm ran rmmod, dh_dkms dropped both, and dkms 3.4.3
+    does not load modules itself. An upgrade unloaded the running module
+    and nothing brought it back, leaving fan control off until a manual
+    modprobe. debian/clevofan-dkms.postinst now modprobes on configure,
+    guarded so an unsupported mainboard (-ENODEV) logs one line and does
+    not fail the install.
+  * Remove the obsolete /etc/fancontrol.d/fancontrol-template conffile
+    left behind by 0.4.0-2 via debian/clevofan-dkms.maintscript, so dpkg
+    no longer warns that /etc/fancontrol.d is not empty on upgrade.
+
+ -- Marco Barbone <mbarbone@flatironinstitute.org>  Thu, 24 Sep 2026 11:30:02 -0400
+
 clevofan-dkms (1.1+diamon2) unstable; urgency=medium
 
   * Always assign hwmon_dev in the platform probe.

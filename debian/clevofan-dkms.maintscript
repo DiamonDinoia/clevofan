@@ -1,0 +1,1 @@
+rm_conffile /etc/fancontrol.d/fancontrol-template 1.1+diamon3~ clevofan-dkms
