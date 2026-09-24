@@ -1,0 +1,22 @@
+#!/bin/sh
+# postinst for clevofan-dkms
+set -e
+
+#DEBHELPER#
+
+case "$1" in
+    configure)
+        # Load it now rather than waiting for udev's DMI-triggered autoload
+        # at next boot: modprobe on an already-loaded module is a no-op, so
+        # this is safe on a fresh install too, and it's what actually closes
+        # the upgrade gap (old prerm ran rmmod, dkms 3.4.3 never re-loads).
+        if ! modprobe clevofan; then
+            echo "clevofan: not loaded; fan control resumes once modprobe clevofan succeeds" >&2
+        fi
+        # dpkg's unpack-time directory prune runs before this script and
+        # never retries; drop the now-empty directory ourselves.
+        rmdir --ignore-fail-on-non-empty /etc/fancontrol.d 2>/dev/null || :
+        ;;
+esac
+
+exit 0
